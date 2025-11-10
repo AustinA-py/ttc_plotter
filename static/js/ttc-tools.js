@@ -8,6 +8,9 @@ console.log('TTC Tools script loading...'); // Debug
 // Flag to prevent interference during apply process
 let isProcessingApply = false;
 
+// Store last applied values for reset functionality
+let lastAppliedValues = {};
+
 console.log('TTC Tools script loaded, isProcessingApply initialized'); // Debug
 
 // Convert feet to approximate meters for Leaflet (rough conversion)
@@ -171,10 +174,16 @@ function applyWorkZoneStyling(layer) {
 
 // Show feature properties panel
 function showFeatureProperties(layer) {
+    console.log('=== showFeatureProperties START ===');
     console.log('showFeatureProperties called for layer:', layer); // Debug statement
+    console.log('Layer type:', layer?.ttcAttributes?.type);
+    console.log('Layer has ttcAttributes:', !!layer?.ttcAttributes);
     
     const panel = document.getElementById('properties-panel');
     const propertiesDiv = document.getElementById('feature-properties');
+    
+    console.log('Panel element found:', !!panel);
+    console.log('Properties div found:', !!propertiesDiv);
     
     if (!panel) {
         console.error('Properties panel element not found');
@@ -200,11 +209,22 @@ function showFeatureProperties(layer) {
     panel.currentLayer = layer;
     
     // Create form based on feature type
-    const formHTML = createAttributeForm(layer.ttcAttributes);
+    const formHTML = createAttributeForm(layer.ttcAttributes, layer);
     propertiesDiv.innerHTML = formHTML;
     
     // Add real-time update event listeners to all form inputs
     addRealTimeUpdateListeners(panel, layer);
+    
+    // Initialize last applied values if they don't exist
+    if (!lastAppliedValues[layer._leaflet_id]) {
+        lastAppliedValues[layer._leaflet_id] = {
+            labelEnabled: layer.ttcAttributes.labelEnabled !== false,
+            labelOffsetX: layer.ttcAttributes.labelOffsetX !== undefined ? layer.ttcAttributes.labelOffsetX : 0,
+            labelOffsetY: layer.ttcAttributes.labelOffsetY !== undefined ? layer.ttcAttributes.labelOffsetY : 25,
+            labelFontSize: layer.ttcAttributes.labelFontSize !== undefined ? layer.ttcAttributes.labelFontSize : 12,
+            labelRotation: layer.ttcAttributes.labelRotation !== undefined ? layer.ttcAttributes.labelRotation : calculateDefaultRotation(layer)
+        };
+    }
     
     // Show panel by removing all hiding styles
     panel.classList.remove('hidden');
@@ -220,8 +240,47 @@ function showFeatureProperties(layer) {
     }
 }
 
+// Calculate the default rotation value for a feature
+function calculateDefaultRotation(layer) {
+    if (!layer || !layer.ttcAttributes) return 0;
+    
+    // Point features (warning-sign, work-point, custom-label) have 0 rotation by default
+    if (layer.ttcAttributes.type === 'warning-sign' || layer.ttcAttributes.type === 'work-point' || layer.ttcAttributes.type === 'custom-label') {
+        return 0;
+    }
+    
+    // For line features, calculate the angle
+    if (layer.getLatLngs) {
+        const latlngs = layer.getLatLngs();
+        if (latlngs && latlngs.length >= 2) {
+            const midIndex = Math.floor(latlngs.length / 2);
+            let startPoint, endPoint;
+            
+            if (latlngs.length === 2) {
+                startPoint = latlngs[0];
+                endPoint = latlngs[1];
+            } else {
+                startPoint = latlngs[midIndex - 1] || latlngs[0];
+                endPoint = latlngs[midIndex] || latlngs[latlngs.length - 1];
+            }
+            
+            const map = layer._map;
+            if (map) {
+                const startScreenPoint = map.latLngToContainerPoint(startPoint);
+                const endScreenPoint = map.latLngToContainerPoint(endPoint);
+                
+                const deltaX = endScreenPoint.x - startScreenPoint.x;
+                const deltaY = endScreenPoint.y - startScreenPoint.y;
+                return Math.round(Math.atan2(deltaY, deltaX) * (180 / Math.PI));
+            }
+        }
+    }
+    
+    return 0;
+}
+
 // Create attribute form HTML based on feature type
-function createAttributeForm(attributes) {
+function createAttributeForm(attributes, layer) {
     console.log('Creating attribute form for:', attributes); // Debug
     
     let formHTML = `<div class="feature-type"><strong>Feature Type:</strong> ${attributes.type.replace('-', ' ').toUpperCase()}</div><br>`;
@@ -271,6 +330,15 @@ function createAttributeForm(attributes) {
                 </div>
             `;
             break;
+            
+        case 'custom-label':
+            formHTML += `
+                <div class="form-group">
+                    <label for="feature-title">Label Text:</label>
+                    <input type="text" id="feature-title" value="${attributes.title}" placeholder="Enter label text">
+                </div>
+            `;
+            break;
     }
     
     // Add collapsible Advanced Labeling Properties section for all feature types
@@ -282,14 +350,24 @@ function createAttributeForm(attributes) {
                 <span class="collapse-arrow">▼</span>
             </div>
             <div class="collapsible-content" style="display: none;">
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="feature-label-enabled" ${attributes.labelEnabled !== false ? 'checked' : ''}>
+                        <span>Display Label</span>
+                    </label>
+                </div>
     `;
     
     // Add label offset for non-work-zone features
     if (attributes.type !== 'work-zone') {
         formHTML += `
             <div class="form-group">
-                <label for="feature-label-offset">Label Offset (pixels):</label>
-                <input type="number" id="feature-label-offset" value="${attributes.labelOffset || 25}" min="10" max="100" step="5">
+                <label for="feature-label-offset-x">Label X Offset (pixels):</label>
+                <input type="number" id="feature-label-offset-x" value="${attributes.labelOffsetX !== undefined ? attributes.labelOffsetX : 0}" min="-100" max="100" step="5">
+            </div>
+            <div class="form-group">
+                <label for="feature-label-offset-y">Label Y Offset (pixels):</label>
+                <input type="number" id="feature-label-offset-y" value="${attributes.labelOffsetY !== undefined ? attributes.labelOffsetY : 25}" min="-100" max="100" step="5">
             </div>
         `;
     }
@@ -298,7 +376,16 @@ function createAttributeForm(attributes) {
     formHTML += `
             <div class="form-group">
                 <label for="feature-label-font-size">Label Font Size (pixels):</label>
-                <input type="number" id="feature-label-font-size" value="${attributes.labelFontSize || 12}" min="8" max="24" step="1">
+                <input type="number" id="feature-label-font-size" value="${attributes.labelFontSize !== undefined ? attributes.labelFontSize : 12}" min="8" max="24" step="1">
+            </div>
+            <div class="form-group">
+                <label for="feature-label-rotation">Label Rotation (degrees):</label>
+                <input type="number" id="feature-label-rotation" value="${attributes.labelRotation !== undefined ? attributes.labelRotation : (layer ? calculateDefaultRotation(layer) : 0)}" min="-180" max="180" step="5">
+            </div>
+            <div class="form-group" style="margin-top: 15px;">
+                <button type="button" id="reset-labeling-btn" onclick="resetLabelingValues()" style="background: #f0f0f0; border: 1px solid #ccc; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                    Reset to Last Applied Values
+                </button>
             </div>
         </div>
     </div>
@@ -306,6 +393,40 @@ function createAttributeForm(attributes) {
     
     console.log('Generated form HTML:', formHTML); // Debug
     return formHTML;
+}
+
+// Reset labeling values to last applied values
+function resetLabelingValues() {
+    const panel = document.getElementById('properties-panel');
+    const layer = panel?.currentLayer;
+    
+    if (!layer || !lastAppliedValues[layer._leaflet_id]) {
+        console.log('No last applied values found for reset');
+        return;
+    }
+    
+    const values = lastAppliedValues[layer._leaflet_id];
+    
+    // Reset label enabled state
+    const labelEnabledInput = document.getElementById('feature-label-enabled');
+    if (labelEnabledInput) labelEnabledInput.checked = values.labelEnabled !== false;
+    
+    // Reset form inputs to last applied values
+    if (layer.ttcAttributes.type !== 'work-zone') {
+        const offsetXInput = document.getElementById('feature-label-offset-x');
+        const offsetYInput = document.getElementById('feature-label-offset-y');
+        if (offsetXInput) offsetXInput.value = values.labelOffsetX !== undefined ? values.labelOffsetX : 0;
+        if (offsetYInput) offsetYInput.value = values.labelOffsetY !== undefined ? values.labelOffsetY : 25;
+    }
+    
+    const fontSizeInput = document.getElementById('feature-label-font-size');
+    const rotationInput = document.getElementById('feature-label-rotation');
+    
+    if (fontSizeInput) fontSizeInput.value = values.labelFontSize !== undefined ? values.labelFontSize : 12;
+    if (rotationInput) rotationInput.value = values.labelRotation !== undefined ? values.labelRotation : calculateDefaultRotation(layer);
+    
+    // Apply the reset values immediately
+    updateFeatureFromForm(layer);
 }
 
 // Toggle advanced labeling properties section
@@ -380,20 +501,37 @@ function updateFeatureFromForm(layer) {
                 layer.ttcAttributes.title = workPointTitle || 'Work Point';
             }
             break;
+            
+        case 'custom-label':
+            const customLabelTitle = document.getElementById('feature-title')?.value;
+            if (customLabelTitle !== undefined) {
+                layer.ttcAttributes.title = customLabelTitle || 'Label';
+            }
+            break;
     }
     
     // Capture label customization settings (applies to all feature types)
-    const labelOffset = document.getElementById('feature-label-offset')?.value;
+    const labelEnabled = document.getElementById('feature-label-enabled')?.checked;
+    const labelOffsetX = document.getElementById('feature-label-offset-x')?.value;
+    const labelOffsetY = document.getElementById('feature-label-offset-y')?.value;
     const labelFontSize = document.getElementById('feature-label-font-size')?.value;
+    const labelRotation = document.getElementById('feature-label-rotation')?.value;
+
+    // Update label enabled state
+    layer.ttcAttributes.labelEnabled = labelEnabled;
     
-    if (labelOffset) {
-        layer.ttcAttributes.labelOffset = parseInt(labelOffset);
+    if (labelOffsetX !== undefined && labelOffsetX !== '') {
+        layer.ttcAttributes.labelOffsetX = parseInt(labelOffsetX);
+    }
+    if (labelOffsetY !== undefined && labelOffsetY !== '') {
+        layer.ttcAttributes.labelOffsetY = parseInt(labelOffsetY);
     }
     if (labelFontSize) {
         layer.ttcAttributes.labelFontSize = parseInt(labelFontSize);
     }
-    
-    console.log('Real-time updated attributes:', layer.ttcAttributes); // Debug
+    if (labelRotation !== '' && labelRotation !== null && labelRotation !== undefined) {
+        layer.ttcAttributes.labelRotation = parseInt(labelRotation);
+    }    console.log('Real-time updated attributes:', layer.ttcAttributes); // Debug
     
     // Update the display immediately
     updateFeatureDisplay(layer);
@@ -421,6 +559,15 @@ function applyFeatureProperties() {
     }
     
     console.log('Finalizing properties for:', layer.ttcAttributes.type); // Debug statement
+    
+    // Store current values as "last applied" for reset functionality
+    lastAppliedValues[layer._leaflet_id] = {
+        labelEnabled: layer.ttcAttributes.labelEnabled,
+        labelOffsetX: layer.ttcAttributes.labelOffsetX,
+        labelOffsetY: layer.ttcAttributes.labelOffsetY,
+        labelFontSize: layer.ttcAttributes.labelFontSize,
+        labelRotation: layer.ttcAttributes.labelRotation
+    };
     
     // Since real-time updates have already applied changes, we just need to do final update
     console.log('Final layer attributes:', layer.ttcAttributes); // Debug
@@ -576,16 +723,28 @@ function updateFeatureDisplay(layer) {
             labelPosition = layer.getLatLng(); // Point position
             console.log('Work point - labelText:', labelText, 'position:', labelPosition); // Debug
             break;
+            
+        case 'custom-label':
+            popupContent = `<strong>Custom Label</strong><br>Text: ${layer.ttcAttributes.title}<br><em>Click to edit attributes</em>`;
+            labelText = layer.ttcAttributes.title;
+            labelPosition = layer.getLatLng(); // Point position
+            console.log('Custom label - labelText:', labelText, 'position:', labelPosition); // Debug
+            break;
+            
+        case 'call-out':
+            // Call-outs don't have labels or popups, just the line
+            console.log('Call-out line - no label created'); // Debug
+            break;
     }
     
     console.log('Final label data - text:', labelText, 'position:', labelPosition); // Debug
     
-    // Create label if we have text and position
-    if (labelText && labelPosition) {
-        console.log('Creating label...'); // Debug
+    // Create label if we have text and position AND labels are enabled
+    if (labelText && labelPosition && layer.ttcAttributes.labelEnabled !== false) {
+        console.log('Creating label for custom label...'); // Debug
         createFeatureLabel(layer, labelText, labelPosition);
     } else {
-        console.log('No label created - missing text or position'); // Debug
+        console.log('No label created for custom label - labelText:', labelText, 'labelPosition:', labelPosition, 'labelEnabled:', layer.ttcAttributes.labelEnabled); // Debug
     }
     
     if (popupContent) {
@@ -596,12 +755,54 @@ function updateFeatureDisplay(layer) {
         
         // Add click handler to edit attributes
         layer.on('click', function(e) {
-            // Only open properties panel if not in delete mode
-            if (!document.getElementById('delete-mode').classList.contains('active')) {
+            console.log('Feature clicked:', layer.ttcAttributes.type); // Debug
+            const deleteMode = document.getElementById('delete-mode');
+            
+            // Check if we're in delete mode
+            if (deleteMode && deleteMode.classList.contains('active')) {
+                console.log('In delete mode, triggering deletion for:', layer.ttcAttributes.type); // Debug
+                
+                // Handle deletion directly
+                if (confirm('Delete this feature?')) {
+                    // Remove label if it exists
+                    if (layer.labelMarker) {
+                        drawnItems.removeLayer(layer.labelMarker);
+                    }
+                    
+                    drawnItems.removeLayer(layer);
+                    
+                    // Remove from feature collections
+                    Object.keys(ttcFeatures).forEach(key => {
+                        const index = ttcFeatures[key].indexOf(layer);
+                        if (index > -1) {
+                            ttcFeatures[key].splice(index, 1);
+                        }
+                    });
+                    
+                    updateFeatureCount();
+                    console.log('Feature deleted via direct click');
+                    
+                    // Close delete tool after successful deletion
+                    if (deleteMode.classList.contains('active')) {
+                        deleteMode.classList.remove('active');
+                        if (typeof disableDeleteMode === 'function') {
+                            disableDeleteMode();
+                        }
+                        console.log('Delete tool closed after feature deletion');
+                    }
+                }
+                
+                // Stop the event from propagating further
+                e.originalEvent.stopPropagation();
+                
+            } else {
+                // Not in delete mode, open properties panel
                 showFeatureProperties(layer);
                 e.originalEvent.stopPropagation();
             }
         });
+    } else {
+        console.log('No popup content for feature type:', layer.ttcAttributes.type); // Debug
     }
     
     console.log('=== updateFeatureDisplay END ==='); // Debug
@@ -658,22 +859,24 @@ function createFeatureLabel(layer, text, position) {
     console.log('Parameters - text:', text, 'position:', position, 'layer type:', layer.ttcAttributes.type); // Debug
     
     // Get customizable values from layer attributes
-    const labelOffset = layer.ttcAttributes.labelOffset || 25;
+    const labelOffsetX = layer.ttcAttributes.labelOffsetX !== undefined ? layer.ttcAttributes.labelOffsetX : 0;
+    const labelOffsetY = layer.ttcAttributes.labelOffsetY !== undefined ? layer.ttcAttributes.labelOffsetY : 25;
     const labelFontSize = layer.ttcAttributes.labelFontSize || 12;
+    const customRotation = layer.ttcAttributes.labelRotation; // Can be undefined for auto behavior
     
-    console.log('Using label offset:', labelOffset, 'font size:', labelFontSize); // Debug
+    console.log('Using label offsets - X:', labelOffsetX, 'Y:', labelOffsetY, 'font size:', labelFontSize, 'custom rotation:', customRotation); // Debug
     
     let offsetPosition = position;
-    let rotation = 0;
+    let rotation = customRotation !== undefined ? customRotation : 0; // Use custom rotation if set, otherwise default to 0
     
     // Handle different feature types
-    if (layer.ttcAttributes.type === 'warning-sign' || layer.ttcAttributes.type === 'work-point') {
+    if (layer.ttcAttributes.type === 'warning-sign' || layer.ttcAttributes.type === 'work-point' || layer.ttcAttributes.type === 'custom-label') {
         console.log('Calculating offset for point feature...'); // Debug
-        // Offset the label above the point
+        // Offset the label using both X and Y offsets
         const map = layer._map;
         if (map) {
             const point = map.latLngToContainerPoint(position);
-            const offsetPoint = L.point(point.x, point.y - labelOffset); // Use customizable offset
+            const offsetPoint = L.point(point.x + labelOffsetX, point.y - labelOffsetY); // X offset right, Y offset up
             offsetPosition = map.containerPointToLatLng(offsetPoint);
             console.log('Offset position:', offsetPosition); // Debug
         }
@@ -702,22 +905,24 @@ function createFeatureLabel(layer, text, position) {
                 const startScreenPoint = map.latLngToContainerPoint(startPoint);
                 const endScreenPoint = map.latLngToContainerPoint(endPoint);
                 
-                // Calculate angle in screen coordinates (this accounts for map projection)
-                const deltaX = endScreenPoint.x - startScreenPoint.x;
-                const deltaY = endScreenPoint.y - startScreenPoint.y;
-                rotation = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-                
-                console.log('Line angle calculated from screen coords:', rotation, 'degrees'); // Debug
+                // Only calculate automatic rotation if no custom rotation is set
+                if (customRotation === undefined) {
+                    // Calculate angle in screen coordinates (this accounts for map projection)
+                    const deltaX = endScreenPoint.x - startScreenPoint.x;
+                    const deltaY = endScreenPoint.y - startScreenPoint.y;
+                    rotation = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+                    
+                    console.log('Line angle calculated from screen coords:', rotation, 'degrees'); // Debug
+                }
                 
                 // Offset the label above the line (perpendicular to line direction)
                 const centerPoint = map.latLngToContainerPoint(position);
                 // Calculate perpendicular offset - subtract 90 degrees to go "up" relative to line direction
                 const perpendicularAngle = (rotation - 90) * (Math.PI / 180);
-                const offsetDistance = labelOffset; // Use customizable offset
                 
                 const offsetPoint = L.point(
-                    centerPoint.x + Math.cos(perpendicularAngle) * offsetDistance,
-                    centerPoint.y + Math.sin(perpendicularAngle) * offsetDistance
+                    centerPoint.x + Math.cos(perpendicularAngle) * labelOffsetY + labelOffsetX, // Y offset perpendicular + X offset parallel to screen
+                    centerPoint.y + Math.sin(perpendicularAngle) * labelOffsetY
                 );
                 
                 offsetPosition = map.containerPointToLatLng(offsetPoint);
@@ -790,6 +995,20 @@ function setupTTCLineDrawing() {
                         type: 'buffer',
                         position: 'Advanced'
                     };
+                } else if (currentTool === 'call-out') {
+                    // Create simple black line for call-out
+                    styledLine = L.polyline(latLngs, {
+                        color: '#000000',
+                        weight: 2,
+                        opacity: 1
+                    });
+                    styledLine.ttcAttributes = {
+                        type: 'call-out'
+                    };
+                    
+                    // Add to call-outs collection
+                    ttcFeatures.callOuts = ttcFeatures.callOuts || [];
+                    ttcFeatures.callOuts.push(styledLine);
                 }
                 
                 if (styledLine) {
@@ -800,11 +1019,23 @@ function setupTTCLineDrawing() {
                     drawnItems.addLayer(styledLine);
                     updateFeatureCount();
                     
-                    // Set up initial display first
-                    updateFeatureDisplay(styledLine);
+                    // Set up initial display first (but skip for call-outs as they don't have labels)
+                    if (styledLine.ttcAttributes.type !== 'call-out') {
+                        updateFeatureDisplay(styledLine);
+                    }
                     
-                    // Always show properties panel for newly created features
-                    showFeatureProperties(styledLine);
+                    // Show properties panel for newly created features (except call-outs)
+                    if (styledLine.ttcAttributes.type !== 'call-out') {
+                        showFeatureProperties(styledLine);
+                    } else {
+                        // For call-outs, close the tool immediately after creation
+                        console.log('Call-out created, closing tool...'); // Debug
+                        clearCurrentTool();
+                        // Remove active class from all tool buttons
+                        document.querySelectorAll('.tool-btn').forEach(btn => {
+                            btn.classList.remove('active');
+                        });
+                    }
                 }
             }
         } else if (type === 'polygon' && currentTool === 'work-location-polygon') {
@@ -828,8 +1059,8 @@ function setupTTCLineDrawing() {
             showFeatureProperties(layer);
         }
         
-        // Keep the tool active for continued drawing only if not processing apply
-        if (!isProcessingApply && (currentTool === 'work-location-polygon' || currentTool === 'lane-closure' || currentTool === 'taper' || currentTool === 'buffer')) {
+        // Keep the tool active for continued drawing only if not processing apply (excluding call-out which closes immediately)
+        if (!isProcessingApply && (currentTool === 'work-location-polygon' || currentTool === 'lane-closure' || currentTool === 'taper' || currentTool === 'buffer') && currentTool !== 'call-out') {
             setTimeout(() => {
                 // Double-check that we're still not processing apply
                 if (!isProcessingApply && map.drawControl && map.drawControl._toolbars && map.drawControl._toolbars.draw) {
@@ -859,10 +1090,12 @@ console.log('Making functions globally accessible...'); // Debug
 window.applyFeatureProperties = applyFeatureProperties;
 window.hideFeatureProperties = hideFeatureProperties;
 window.showFeatureProperties = showFeatureProperties;
+window.resetLabelingValues = resetLabelingValues;
 console.log('Functions assigned to window object:', {
     applyFeatureProperties: typeof window.applyFeatureProperties,
     hideFeatureProperties: typeof window.hideFeatureProperties,
-    showFeatureProperties: typeof window.showFeatureProperties
+    showFeatureProperties: typeof window.showFeatureProperties,
+    resetLabelingValues: typeof window.resetLabelingValues
 }); // Debug
 
 // Add a mutation observer to monitor the properties panel

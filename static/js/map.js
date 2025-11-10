@@ -15,7 +15,9 @@ let ttcFeatures = {
     laneClosures: [],
     tapers: [],
     buffers: [],
-    warningSigns: []
+    warningSigns: [],
+    customLabels: [],
+    callOuts: []
 };
 
 // Initialize the map
@@ -52,8 +54,12 @@ function initializeMapEvents() {
 
     // Handle map clicks for different tools
     map.on('click', function(e) {
+        console.log('Map clicked, currentTool:', currentTool, 'at position:', e.latlng);
         if (currentTool) {
+            console.log('Handling tool click for:', currentTool);
             handleToolClick(e);
+        } else {
+            console.log('No current tool set');
         }
     });
 
@@ -154,6 +160,7 @@ function updateFeatureCount() {
 
 // Handle tool clicks on the map
 function handleToolClick(e) {
+    console.log('=== handleToolClick START ===', currentTool);
     switch(currentTool) {
         case 'work-location-point':
             createWorkLocationPoint(e.latlng);
@@ -161,10 +168,15 @@ function handleToolClick(e) {
         case 'warning-sign':
             createWarningSign(e.latlng);
             break;
+        case 'custom-label':
+            console.log('Creating custom label at:', e.latlng);
+            createCustomLabel(e.latlng);
+            break;
         // Polygon and line tools will be handled by draw controls
         default:
             console.log('Tool not implemented for click:', currentTool);
     }
+    console.log('=== handleToolClick END ===');
 }
 
 // Create work location point
@@ -231,6 +243,58 @@ function createWarningSign(latlng) {
     console.log('Warning sign created at:', latlng);
 }
 
+// Create custom label
+function createCustomLabel(latlng) {
+    // Create invisible marker (no visual symbol, just for positioning)
+    const customLabel = L.marker(latlng, {
+        icon: L.divIcon({
+            className: 'custom-label-icon',
+            html: '<div style="width: 20px; height: 20px; background: transparent; border: 1px solid transparent;"></div>',  // Transparent but present content
+            iconSize: [20, 20],  // Larger size for easier clicking
+            iconAnchor: [10, 10]  // Center the anchor
+        }),
+        // Don't use opacity: 0, keep the marker fully interactive
+        interactive: true  // Make sure it can receive click events for properties panel
+    });
+
+    // Set default attributes for custom label
+    customLabel.ttcAttributes = {
+        type: 'custom-label',
+        title: 'Label',
+        labelEnabled: true,
+        labelOffsetX: 0,
+        labelOffsetY: 0,
+        labelFontSize: 12,
+        labelRotation: 0
+    };
+
+    console.log('Custom label created with attributes:', customLabel.ttcAttributes);
+    console.log('Adding custom label to drawnItems...');
+
+    customLabel.addTo(drawnItems);
+    console.log('Custom label added to drawnItems successfully');
+    
+    // Add to custom labels collection
+    ttcFeatures.customLabels = ttcFeatures.customLabels || [];
+    ttcFeatures.customLabels.push(customLabel);
+    console.log('Custom label added to collection, total custom labels:', ttcFeatures.customLabels.length);
+    
+    updateFeatureCount();
+    console.log('Feature count updated');
+    
+    // Set up initial display first
+    console.log('Calling updateFeatureDisplay for custom label...');
+    updateFeatureDisplay(customLabel);
+    console.log('updateFeatureDisplay completed');
+    
+    // Show properties panel for user to set title and other properties
+    console.log('Calling showFeatureProperties for custom label...');
+    showFeatureProperties(customLabel);
+    console.log('showFeatureProperties completed');
+    
+    console.log('Custom label created at:', latlng);
+}
+
 // Set current tool
 function setCurrentTool(toolName) {
     currentTool = toolName;
@@ -268,7 +332,18 @@ function setCurrentTool(toolName) {
                 }
             }
         }, 100);
-    } else if (toolName === 'work-location-point' || toolName === 'warning-sign') {
+    } else if (toolName === 'call-out') {
+        addLineDrawControl(toolName);
+        // Immediately start line drawing for call-out
+        setTimeout(() => {
+            if (map.drawControl && map.drawControl._toolbars && map.drawControl._toolbars.draw) {
+                const polylineButton = map.drawControl._toolbars.draw._modes.polyline;
+                if (polylineButton && polylineButton.handler) {
+                    polylineButton.handler.enable();
+                }
+            }
+        }, 100);
+    } else if (toolName === 'work-location-point' || toolName === 'warning-sign' || toolName === 'custom-label') {
         // Set crosshair cursor for point tools
         document.getElementById('map').style.cursor = 'crosshair';
     }
@@ -461,6 +536,24 @@ function clearCurrentTool() {
         map.removeControl(map.drawControl);
         map.drawControl = null;
     }
+    
+    // Only disable delete mode if not explicitly skipped (to avoid conflicts)
+    if (!clearCurrentTool._skipDeleteDisable) {
+        const deleteBtn = document.getElementById('delete-mode');
+        if (deleteBtn && deleteBtn.classList.contains('active')) {
+            deleteBtn.classList.remove('active');
+            // Call the disableDeleteMode function if it exists
+            if (typeof disableDeleteMode === 'function') {
+                // Use a flag to prevent infinite recursion
+                if (!clearCurrentTool._disablingDelete) {
+                    clearCurrentTool._disablingDelete = true;
+                    disableDeleteMode();
+                    clearCurrentTool._disablingDelete = false;
+                }
+            }
+            console.log('Delete mode disabled by clearCurrentTool');
+        }
+    }
 }
 
 // Clear all features
@@ -475,7 +568,9 @@ function clearAllFeatures() {
             laneClosures: [],
             tapers: [],
             buffers: [],
-            warningSigns: []
+            warningSigns: [],
+            customLabels: [],
+            callOuts: []
         };
         
         updateFeatureCount();
@@ -554,6 +649,20 @@ function loadFeaturesFromGeoJSON(geoJSON) {
                     if (typeof ttcFeatures !== 'undefined') {
                         ttcFeatures.warningSigns.push(layer);
                     }
+                } else if (ttcType === 'custom-label') {
+                    layer = L.marker(latlng, {
+                        icon: L.divIcon({
+                            className: 'custom-label-icon',
+                            html: '',
+                            iconSize: [1, 1],
+                            iconAnchor: [0, 0]
+                        }),
+                        opacity: 0
+                    });
+                    if (typeof ttcFeatures !== 'undefined') {
+                        ttcFeatures.customLabels = ttcFeatures.customLabels || [];
+                        ttcFeatures.customLabels.push(layer);
+                    }
                 } else {
                     // Skip unknown point types to avoid creating default blue markers
                     console.warn('Unknown point feature type:', ttcType, 'Skipping feature.');
@@ -592,6 +701,9 @@ function loadFeaturesFromGeoJSON(geoJSON) {
                     case 'buffer':
                         lineStyle = { color: '#ffff00', weight: 5, dashArray: '10,5,2,5' };
                         break;
+                    case 'call-out':
+                        lineStyle = { color: '#000000', weight: 2, opacity: 1 };
+                        break;
                     default:
                         console.warn('Unknown line feature type:', ttcType, 'Skipping feature.');
                         return;
@@ -604,6 +716,10 @@ function loadFeaturesFromGeoJSON(geoJSON) {
                     if (ttcType === 'lane-closure') ttcFeatures.laneClosures.push(layer);
                     else if (ttcType === 'taper') ttcFeatures.tapers.push(layer);
                     else if (ttcType === 'buffer') ttcFeatures.buffers.push(layer);
+                    else if (ttcType === 'call-out') {
+                        ttcFeatures.callOuts = ttcFeatures.callOuts || [];
+                        ttcFeatures.callOuts.push(layer);
+                    }
                 }
             } else {
                 console.warn('Unknown geometry type:', geom.type, 'Skipping feature.');
@@ -611,14 +727,22 @@ function loadFeaturesFromGeoJSON(geoJSON) {
             }
             
             if (layer) {
-                // Restore TTC attributes
+                // Restore TTC attributes including all labeling properties
                 layer.ttcAttributes = {
                     type: ttcType,
                     title: props.title,
                     position: props.position,
                     signType: props.signType,
+                    // Handle backward compatibility for single labelOffset
                     labelOffset: props.labelOffset,
-                    labelFontSize: props.labelFontSize
+                    // New separate X/Y offset support with backward compatibility
+                    labelOffsetX: props.labelOffsetX !== undefined ? props.labelOffsetX : 0,
+                    labelOffsetY: props.labelOffsetY !== undefined ? props.labelOffsetY : (props.labelOffset || 25),
+                    // Label styling properties
+                    labelFontSize: props.labelFontSize,
+                    labelRotation: props.labelRotation,
+                    // Label visibility control (default to enabled for backward compatibility)
+                    labelEnabled: props.labelEnabled !== false
                 };
                 
                 // Add to map

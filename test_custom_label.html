@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Custom Label</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        pre { background-color: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Custom Label Debug Test</h1>
+    
+    <div id="test-results"></div>
+    
+    <script>
+        function runTests() {
+            const results = document.getElementById('test-results');
+            
+            // Test 1: Check if custom-label button exists in DOM
+            const customLabelBtn = document.getElementById('custom-label');
+            if (customLabelBtn) {
+                results.innerHTML += '<div class="test-result success">✓ Custom label button found in DOM</div>';
+            } else {
+                results.innerHTML += '<div class="test-result error">✗ Custom label button NOT found in DOM</div>';
+            }
+            
+            // Test 2: Check if map.js functions exist
+            if (typeof createCustomLabel === 'function') {
+                results.innerHTML += '<div class="test-result success">✓ createCustomLabel function exists</div>';
+            } else {
+                results.innerHTML += '<div class="test-result error">✗ createCustomLabel function NOT found</div>';
+            }
+            
+            if (typeof setCurrentTool === 'function') {
+                results.innerHTML += '<div class="test-result success">✓ setCurrentTool function exists</div>';
+            } else {
+                results.innerHTML += '<div class="test-result error">✗ setCurrentTool function NOT found</div>';
+            }
+            
+            // Test 3: Check if ttc-tools.js functions exist
+            if (typeof showFeatureProperties === 'function') {
+                results.innerHTML += '<div class="test-result success">✓ showFeatureProperties function exists</div>';
+            } else {
+                results.innerHTML += '<div class="test-result error">✗ showFeatureProperties function NOT found</div>';
+            }
+            
+            // Test 4: Check if ttcFeatures object exists
+            if (typeof ttcFeatures !== 'undefined') {
+                results.innerHTML += '<div class="test-result success">✓ ttcFeatures object exists</div>';
+                
+                if (ttcFeatures.customLabels) {
+                    results.innerHTML += '<div class="test-result success">✓ ttcFeatures.customLabels array exists</div>';
+                } else {
+                    results.innerHTML += '<div class="test-result error">✗ ttcFeatures.customLabels array NOT found</div>';
+                }
+            } else {
+                results.innerHTML += '<div class="test-result error">✗ ttcFeatures object NOT found</div>';
+            }
+            
+            // Test 5: Try to simulate custom label creation
+            try {
+                // We can't actually run this without a map, but we can check the logic
+                results.innerHTML += '<div class="test-result info">ℹ To test custom label creation, click the Custom Label button and then click on the map</div>';
+                results.innerHTML += '<div class="test-result info">ℹ Open browser console (F12) to see debug output</div>';
+            } catch (error) {
+                results.innerHTML += '<div class="test-result error">✗ Error testing custom label creation: ' + error.message + '</div>';
+            }
+        }
+        
+        // Run tests when page loads
+        document.addEventListener('DOMContentLoaded', runTests);
+    </script>
+</body>
+</html>
