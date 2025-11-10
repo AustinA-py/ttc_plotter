@@ -75,6 +75,29 @@ TTC Plotter provides an interactive map interface for creating temporary traffic
 
 **Example**: To create a work zone with a custom label, select the Work Zone tool, draw a polygon on the map, right-click the feature, enter "Main Street Construction" as the title, expand Labeling Properties to increase the font size to 14px, then click Apply to finalize the feature.
 
+### Import/Export Functionality
+
+TTC Plotter supports importing and exporting traffic control patterns as GeoJSON files, enabling you to save your work, share patterns with colleagues, and reuse existing layouts:
+
+#### Importing GeoJSON Files
+
+1. **Load Pattern**: Click the folder icon (📁) in the header to import a previously saved TTC pattern
+2. **File Selection**: Choose a GeoJSON file from your computer containing TTC features
+3. **Automatic Loading**: All features from the file will be loaded onto the map with their original attributes, labels, and styling preserved
+4. **Supported Features**: The application recognizes and properly displays all TTC feature types including work zones, lane closures, warning signs, and work points
+
+#### Exporting Your Work
+
+1. **Download Data**: Click the download icon (📥) in the header to export your current TTC pattern
+2. **GeoJSON Format**: Your pattern is saved as a standards-compliant GeoJSON file containing:
+   - All feature geometries (points, lines, polygons)
+   - Complete attribute data (titles, positions, sign types)
+   - Label configuration settings (font size, offset values)
+   - Feature-specific styling information
+3. **File Compatibility**: Exported files can be imported back into TTC Plotter or used with other GIS applications that support GeoJSON
+
+**Example Workflow**: Create a complete TTC pattern for a construction project, export it as "main_street_pattern.json", share with your team for review, then import the file later to make modifications or create variations for different project phases.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
