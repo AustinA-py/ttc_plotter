@@ -495,7 +495,14 @@ function getAllFeaturesAsGeoJSON() {
             const feature = layer.toGeoJSON();
             
             // Add TTC-specific properties
-            if (layer.options && layer.options.icon && layer.options.icon.options.className) {
+            if (layer.ttcAttributes) {
+                // Include all TTC attributes in properties
+                feature.properties = {
+                    ...feature.properties,
+                    ...layer.ttcAttributes
+                };
+            } else if (layer.options && layer.options.icon && layer.options.icon.options.className) {
+                // Fallback for legacy features
                 feature.properties.ttcType = layer.options.icon.options.className.replace('-icon', '');
             }
             
@@ -512,49 +519,116 @@ function loadFeaturesFromGeoJSON(geoJSON) {
     
     if (geoJSON && geoJSON.features) {
         geoJSON.features.forEach(function(feature) {
-            const layer = L.geoJSON(feature, {
-                pointToLayer: function(feature, latlng) {
-                    // Recreate custom markers based on TTC type
-                    if (feature.properties.ttcType === 'work-point') {
-                        return L.marker(latlng, {
-                            icon: L.divIcon({
-                                className: 'work-point-icon',
-                                html: '<i class="fas fa-star"></i>',
-                                iconSize: [20, 20],
-                                iconAnchor: [10, 10]
-                            })
-                        });
-                    } else if (feature.properties.ttcType === 'warning-sign') {
-                        return L.marker(latlng, {
-                            icon: L.divIcon({
-                                className: 'warning-sign-icon',
-                                html: '<i class="fas fa-exclamation-triangle"></i>',
-                                iconSize: [20, 20],
-                                iconAnchor: [10, 10]
-                            })
-                        });
-                    }
-                    
-                    return L.marker(latlng);
-                },
-                style: function(feature) {
-                    // Apply styles based on TTC type
-                    if (feature.geometry.type === 'Polygon') {
-                        return {
-                            color: '#ffcc00',
-                            fillColor: '#ffcc00',
-                            fillOpacity: 0.3
-                        };
-                    } else if (feature.geometry.type === 'LineString') {
-                        return {
-                            color: '#ff6600',
-                            weight: 4
-                        };
-                    }
-                }
-            });
+            const props = feature.properties;
+            const geom = feature.geometry;
+            let layer;
             
-            drawnItems.addLayer(layer);
+            // Determine TTC type from properties
+            const ttcType = props.type || props.ttcType;
+            
+            // Create layer based on geometry type and TTC type
+            if (geom.type === 'Point') {
+                const latlng = [geom.coordinates[1], geom.coordinates[0]];
+                
+                if (ttcType === 'work-point') {
+                    layer = L.marker(latlng, {
+                        icon: L.divIcon({
+                            className: 'work-point-icon',
+                            html: '<i class="fas fa-star"></i>',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    });
+                    if (typeof ttcFeatures !== 'undefined') {
+                        ttcFeatures.workPoints.push(layer);
+                    }
+                } else if (ttcType === 'warning-sign') {
+                    layer = L.marker(latlng, {
+                        icon: L.divIcon({
+                            className: 'warning-sign-icon',
+                            html: '<i class="fas fa-exclamation-triangle"></i>',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    });
+                    if (typeof ttcFeatures !== 'undefined') {
+                        ttcFeatures.warningSigns.push(layer);
+                    }
+                } else {
+                    // Skip unknown point types to avoid creating default blue markers
+                    console.warn('Unknown point feature type:', ttcType, 'Skipping feature.');
+                    return;
+                }
+                
+            } else if (geom.type === 'Polygon') {
+                // Work zone polygon
+                if (ttcType === 'work-zone') {
+                    const coords = geom.coordinates[0].map(coord => [coord[1], coord[0]]);
+                    layer = L.polygon(coords, {
+                        color: '#ffcc00',
+                        fillColor: '#ffcc00',
+                        fillOpacity: 0.3
+                    });
+                    if (typeof ttcFeatures !== 'undefined') {
+                        ttcFeatures.workZones.push(layer);
+                    }
+                } else {
+                    console.warn('Unknown polygon feature type:', ttcType, 'Skipping feature.');
+                    return;
+                }
+                
+            } else if (geom.type === 'LineString') {
+                // Line features (lane closure, taper, buffer)
+                const coords = geom.coordinates.map(coord => [coord[1], coord[0]]);
+                let lineStyle;
+                
+                switch (ttcType) {
+                    case 'lane-closure':
+                        lineStyle = { color: '#ff0000', weight: 6, dashArray: '15,10' };
+                        break;
+                    case 'taper':
+                        lineStyle = { color: '#ff9900', weight: 8, dashArray: '12,8' };
+                        break;
+                    case 'buffer':
+                        lineStyle = { color: '#ffff00', weight: 5, dashArray: '10,5,2,5' };
+                        break;
+                    default:
+                        console.warn('Unknown line feature type:', ttcType, 'Skipping feature.');
+                        return;
+                }
+                
+                layer = L.polyline(coords, lineStyle);
+                
+                // Add to appropriate ttcFeatures collection after creating layer
+                if (typeof ttcFeatures !== 'undefined') {
+                    if (ttcType === 'lane-closure') ttcFeatures.laneClosures.push(layer);
+                    else if (ttcType === 'taper') ttcFeatures.tapers.push(layer);
+                    else if (ttcType === 'buffer') ttcFeatures.buffers.push(layer);
+                }
+            } else {
+                console.warn('Unknown geometry type:', geom.type, 'Skipping feature.');
+                return;
+            }
+            
+            if (layer) {
+                // Restore TTC attributes
+                layer.ttcAttributes = {
+                    type: ttcType,
+                    title: props.title,
+                    position: props.position,
+                    signType: props.signType,
+                    labelOffset: props.labelOffset,
+                    labelFontSize: props.labelFontSize
+                };
+                
+                // Add to map
+                layer.addTo(drawnItems);
+                
+                // Update feature display (labels, etc.)
+                if (typeof updateFeatureDisplay === 'function') {
+                    updateFeatureDisplay(layer);
+                }
+            }
         });
         
         updateFeatureCount();

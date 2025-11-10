@@ -625,27 +625,92 @@ function handleDeleteClick(e) {
 }
 
 // Load pattern function
+// Load pattern from file upload
 async function loadPattern() {
     try {
-        const response = await fetch('/api/load-patterns');
-        const result = await response.json();
+        // Create a hidden file input element
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.geojson,.json';
+        fileInput.style.display = 'none';
         
-        if (result.success) {
-            // For now, just show a message since we don't have saved patterns yet
-            alert('Load functionality will be implemented when patterns are saved to a database');
+        // Add to document temporarily
+        document.body.appendChild(fileInput);
+        
+        // Set up file selection handler
+        fileInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                document.body.removeChild(fileInput);
+                return;
+            }
             
-            // Example of how loading would work:
-            // const selectedPattern = /* pattern selection logic */;
-            // loadFeaturesFromGeoJSON(selectedPattern.features);
-            // if (selectedPattern.bounds) {
-            //     map.fitBounds(selectedPattern.bounds);
-            // }
-        } else {
-            alert('Error loading patterns: ' + result.message);
-        }
+            // Validate file type
+            const fileName = file.name.toLowerCase();
+            if (!fileName.endsWith('.geojson') && !fileName.endsWith('.json')) {
+                alert('Please select a valid GeoJSON file (.geojson or .json).');
+                document.body.removeChild(fileInput);
+                return;
+            }
+            
+            // Read the file
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const geoJSONData = JSON.parse(e.target.result);
+                    
+                    // Validate the GeoJSON structure
+                    if (!geoJSONData || typeof geoJSONData !== 'object') {
+                        throw new Error('Invalid JSON format');
+                    }
+                    
+                    // Check if it's a valid GeoJSON
+                    if (geoJSONData.type !== 'FeatureCollection' || !Array.isArray(geoJSONData.features)) {
+                        throw new Error('Invalid GeoJSON format. File must be a FeatureCollection with features array.');
+                    }
+                    
+                    // Load the GeoJSON features
+                    loadFeaturesFromGeoJSON(geoJSONData);
+                    alert(`GeoJSON loaded successfully! Loaded ${geoJSONData.features.length} features.`);
+                    
+                    // Zoom to pattern bounds if available in metadata
+                    if (geoJSONData.metadata && geoJSONData.metadata.bounds) {
+                        const bounds = geoJSONData.metadata.bounds;
+                        map.fitBounds([
+                            [bounds._southWest.lat, bounds._southWest.lng],
+                            [bounds._northEast.lat, bounds._northEast.lng]
+                        ]);
+                    } else {
+                        // Calculate bounds from features
+                        const group = new L.featureGroup(drawnItems.getLayers());
+                        if (group.getBounds().isValid()) {
+                            map.fitBounds(group.getBounds());
+                        }
+                    }
+                    
+                } catch (parseError) {
+                    alert('Error reading file: ' + parseError.message);
+                    console.error('File parse error:', parseError);
+                }
+                
+                // Clean up
+                document.body.removeChild(fileInput);
+            };
+            
+            reader.onerror = function() {
+                alert('Error reading file.');
+                document.body.removeChild(fileInput);
+            };
+            
+            // Start reading the file
+            reader.readAsText(file);
+        });
+        
+        // Trigger file selection dialog
+        fileInput.click();
         
     } catch (error) {
-        alert('Error loading patterns: ' + error.message);
+        alert('Error loading pattern: ' + error.message);
         console.error('Load error:', error);
     }
 }
@@ -653,46 +718,32 @@ async function loadPattern() {
 // Export pattern function
 async function exportPattern() {
     try {
-        const exportFormat = prompt('Export format (json/geojson):', 'json');
+        // Get all features as GeoJSON
+        const geoJSONData = getAllFeaturesAsGeoJSON();
         
-        if (!exportFormat) return;
+        if (!geoJSONData || !geoJSONData.features || geoJSONData.features.length === 0) {
+            alert('No features to export. Please draw some features first.');
+            return;
+        }
         
-        const patternData = {
-            format: exportFormat,
-            features: getAllFeaturesAsGeoJSON(),
-            bounds: map.getBounds(),
-            exported: new Date().toISOString()
+        // Add metadata to the GeoJSON
+        geoJSONData.metadata = {
+            application: 'TTC Plotter',
+            version: '1.0',
+            exported: new Date().toISOString(),
+            bounds: map.getBounds()
         };
         
-        if (exportFormat.toLowerCase() === 'json' || exportFormat.toLowerCase() === 'geojson') {
-            // Download as JSON file
-            const dataStr = JSON.stringify(patternData, null, 2);
-            const dataBlob = new Blob([dataStr], {type: 'application/json'});
-            
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(dataBlob);
-            link.download = `ttc-pattern-${new Date().toISOString().split('T')[0]}.${exportFormat}`;
-            link.click();
-            
-            console.log('Pattern exported successfully');
-        } else {
-            // For other formats, use the API
-            const response = await fetch('/api/export-pattern', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(patternData)
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                alert('Export prepared: ' + result.message);
-            } else {
-                alert('Error exporting pattern: ' + result.message);
-            }
-        }
+        // Download as GeoJSON file
+        const dataStr = JSON.stringify(geoJSONData, null, 2);
+        const dataBlob = new Blob([dataStr], {type: 'application/geo+json'});
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `ttc-pattern-${new Date().toISOString().split('T')[0]}.geojson`;
+        link.click();
+        
+        console.log(`GeoJSON exported successfully with ${geoJSONData.features.length} features`);
         
     } catch (error) {
         alert('Error exporting pattern: ' + error.message);
