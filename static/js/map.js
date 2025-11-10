@@ -27,10 +27,10 @@ function initializeMap() {
         zoomControl: true
     });
 
-    // Add satellite imagery base layer (using ESRI World Imagery)
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-        maxZoom: 18
+    // Add satellite imagery base layer (using Google Satellite)
+    L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        attribution: '&copy; Google',
+        maxZoom: 22
     }).addTo(map);
 
     // Create a layer group for drawn items
