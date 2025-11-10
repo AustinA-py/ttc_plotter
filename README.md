@@ -51,7 +51,29 @@ TTC Plotter is a web application that streamlines the process of creating visual
 
 ## Usage
 
-(Usage instructions will be added as features are implemented)
+### Creating and Configuring Features
+
+TTC Plotter provides an interactive map interface for creating temporary traffic control features. Here's how to create and customize a feature:
+
+1. **Create a Feature**: Select a tool from the sidebar (e.g., Work Zone, Lane Closure, Warning Sign) and draw the feature on the map by clicking or drawing lines/polygons as appropriate.
+
+2. **Access Feature Properties**: Right-click on any created feature to open the Feature Properties panel, which allows you to configure the feature's attributes and appearance.
+
+3. **Configure Attributes**: Each feature type has specific attributes you can set:
+   - **Work Zones**: Set a descriptive title
+   - **Lane Closures/Tapers/Buffers**: Choose position (Advanced or Post)
+   - **Warning Signs**: Select sign type (Lane Closed, Shoulder Closed, Road Work Ahead)
+   - **Work Points**: Set a descriptive title
+
+4. **Customize Labels**: Expand the "Labeling Properties" section to adjust how feature labels appear on the map:
+   - **Label Offset**: Control how far the label appears from the feature (available for most feature types)
+   - **Label Font Size**: Adjust the text size of the label (available for all feature types)
+
+5. **Real-time Preview**: All changes update the map instantly as you modify values, allowing you to see exactly how your feature will appear before finalizing.
+
+6. **Apply Changes**: Click "Apply" to save your changes and close the properties panel.
+
+**Example**: To create a work zone with a custom label, select the Work Zone tool, draw a polygon on the map, right-click the feature, enter "Main Street Construction" as the title, expand Labeling Properties to increase the font size to 14px, then click Apply to finalize the feature.
 
 ## Contributing
 
@@ -59,8 +81,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-(License information to be added)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Contact
 
-(Contact information to be added)
+For questions, suggestions, or contributions, visit: [https://AustinA-py.github.io](https://AustinA-py.github.io)

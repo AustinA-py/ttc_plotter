@@ -371,21 +371,151 @@ function setupPropertiesPanel() {
     const closeBtn = document.getElementById('close-properties');
     if (closeBtn) {
         closeBtn.addEventListener('click', function() {
-            hidePropertiesPanel();
+            console.log('Close button clicked'); // Debug statement
+            
+            // Clear current drawing tool
+            if (typeof clearCurrentTool === 'function') {
+                clearCurrentTool();
+            }
+            
+            // Remove active class from all tool buttons
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            if (typeof hideFeatureProperties === 'function') {
+                hideFeatureProperties();
+            } else {
+                console.error('hideFeatureProperties function not found');
+            }
         });
     }
     
     const applyBtn = document.getElementById('apply-properties');
     if (applyBtn) {
         applyBtn.addEventListener('click', function() {
-            applyFeatureProperties();
+            console.log('Apply button clicked'); // Debug statement
+            console.log('applyFeatureProperties function exists:', typeof window.applyFeatureProperties); // Debug
+            
+            // Apply feature properties (this function will handle clearing tools and closing panel)
+            if (typeof window.applyFeatureProperties === 'function') {
+                console.log('Calling applyFeatureProperties...'); // Debug
+                try {
+                    window.applyFeatureProperties();
+                    console.log('applyFeatureProperties call completed'); // Debug
+                } catch (error) {
+                    console.error('Error calling applyFeatureProperties:', error);
+                    // Use fallback
+                    console.log('Using fallback due to error...');
+                    fallbackApply();
+                }
+            } else {
+                console.error('applyFeatureProperties function not found on window object');
+                console.error('Available functions on window:', Object.keys(window).filter(key => key.includes('Feature')));
+                
+                // Use fallback implementation
+                console.log('Using fallback implementation...');
+                fallbackApply();
+            }
         });
+    }
+    
+    // Fallback implementation
+    function fallbackApply() {
+        console.log('=== FALLBACK APPLY START ===');
+        const panel = document.getElementById('properties-panel');
+        const layer = panel?.currentLayer;
+        
+        if (layer && layer.ttcAttributes) {
+            console.log('Applying properties for:', layer.ttcAttributes.type);
+            
+            // Update attributes based on feature type
+            switch (layer.ttcAttributes.type) {
+                case 'work-zone':
+                    const title = document.getElementById('feature-title')?.value;
+                    if (title) layer.ttcAttributes.title = title;
+                    break;
+                    
+                case 'lane-closure':
+                case 'taper':
+                case 'buffer':
+                    const position = document.getElementById('feature-position')?.value;
+                    if (position) layer.ttcAttributes.position = position;
+                    break;
+                    
+                case 'warning-sign':
+                    const signType = document.getElementById('feature-sign-type')?.value;
+                    if (signType) layer.ttcAttributes.signType = signType;
+                    break;
+            }
+            
+            // Update popup content if updateFeatureDisplay exists
+            if (typeof window.updateFeatureDisplay === 'function') {
+                window.updateFeatureDisplay(layer);
+            }
+            
+            // Clear current tool
+            if (typeof clearCurrentTool === 'function') {
+                clearCurrentTool();
+            }
+            
+            // Remove active class from all tool buttons
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Hide the panel FORCEFULLY
+            if (panel) {
+                console.log('Hiding panel - classes before:', panel.className);
+                console.log('Panel visible before:', !panel.classList.contains('hidden'));
+                
+                panel.classList.add('hidden');
+                panel.style.display = 'none';
+                panel.style.visibility = 'hidden';
+                panel.currentLayer = null;
+                
+                console.log('Hiding panel - classes after:', panel.className);
+                console.log('Panel visible after:', !panel.classList.contains('hidden'));
+                console.log('Panel computed display:', window.getComputedStyle(panel).display);
+                
+                // Force browser to acknowledge the changes
+                panel.offsetHeight;
+                
+                console.log('Panel should be hidden now');
+            }
+            
+            // Reset status
+            const measurementInfo = document.getElementById('measurement-info');
+            if (measurementInfo) {
+                measurementInfo.textContent = 'Measurement: --';
+            }
+            
+            console.log('=== FALLBACK APPLY COMPLETE ===');
+        } else {
+            console.error('No layer or attributes found in fallback');
+        }
     }
     
     const cancelBtn = document.getElementById('cancel-properties');
     if (cancelBtn) {
         cancelBtn.addEventListener('click', function() {
-            hidePropertiesPanel();
+            console.log('Cancel button clicked'); // Debug statement
+            
+            // Clear current drawing tool
+            if (typeof clearCurrentTool === 'function') {
+                clearCurrentTool();
+            }
+            
+            // Remove active class from all tool buttons
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            if (typeof hideFeatureProperties === 'function') {
+                hideFeatureProperties();
+            } else {
+                console.error('hideFeatureProperties function not found');
+            }
         });
     }
 }
@@ -465,6 +595,11 @@ function handleDeleteClick(e) {
     
     if (featureToDelete) {
         if (confirm('Delete this feature?')) {
+            // Remove label if it exists
+            if (featureToDelete.labelMarker) {
+                drawnItems.removeLayer(featureToDelete.labelMarker);
+            }
+            
             drawnItems.removeLayer(featureToDelete);
             
             // Remove from feature collections
@@ -663,8 +798,8 @@ function hidePropertiesPanel() {
     }
 }
 
-// Apply feature properties
-function applyFeatureProperties() {
+// Apply feature properties (legacy - not used for TTC features)
+function applyLegacyFeatureProperties() {
     const panel = document.getElementById('properties-panel');
     const feature = panel?.currentFeature;
     
