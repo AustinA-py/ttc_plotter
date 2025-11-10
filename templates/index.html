@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTC Plotter - Temporary Traffic Control Pattern Designer</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <button id="sidebar-toggle" class="sidebar-toggle" title="Toggle Sidebar">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="title-section">
+                        <h1><i class="fas fa-road"></i> TTC Plotter</h1>
+                        <p>Temporary Traffic Control Pattern Designer</p>
+                    </div>
+                </div>
+                
+                <!-- Search Bar -->
+                <div class="search-container">
+                    <div class="search-box">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" id="location-search" placeholder="Search for address or coordinates..." />
+                        <button id="search-button" class="search-btn" title="Search">
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                    <div id="search-results" class="search-results hidden"></div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h3><i class="fas fa-tools"></i> Tools</h3>
+                <button id="sidebar-close" class="sidebar-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="sidebar-content">
+                <div class="tool-section">
+                    <h4>Drawing Tools</h4>
+                    <div class="tool-buttons">
+                        <button id="work-location-polygon" class="tool-btn" title="Work Location (Polygon)">
+                            <i class="fas fa-draw-polygon"></i> 
+                            <span>Work Zone</span>
+                            <small>Draw polygon area</small>
+                        </button>
+                        <button id="work-location-point" class="tool-btn" title="Work Location (Point)">
+                            <i class="fas fa-star"></i> 
+                            <span>Work Point</span>
+                            <small>Place work marker</small>
+                        </button>
+                        <button id="lane-closure" class="tool-btn" title="Lane Closure">
+                            <i class="fas fa-grip-lines"></i> 
+                            <span>Lane Closure</span>
+                            <small>Draw closure line</small>
+                        </button>
+                        <button id="taper" class="tool-btn" title="Taper">
+                            <i class="fas fa-long-arrow-alt-right"></i> 
+                            <span>Taper</span>
+                            <small>Draw taper line</small>
+                        </button>
+                        <button id="buffer" class="tool-btn" title="Buffer">
+                            <i class="fas fa-minus"></i> 
+                            <span>Buffer</span>
+                            <small>Draw buffer line</small>
+                        </button>
+                        <button id="warning-sign" class="tool-btn" title="Warning Sign">
+                            <i class="fas fa-exclamation-triangle"></i> 
+                            <span>Warning Sign</span>
+                            <small>Place warning marker</small>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="tool-section">
+                    <h4>Controls</h4>
+                    <div class="tool-buttons">
+                        <button id="delete-mode" class="tool-btn danger" title="Delete Mode">
+                            <i class="fas fa-trash"></i> 
+                            <span>Delete</span>
+                            <small>Remove features</small>
+                        </button>
+                        <button id="clear-all" class="tool-btn danger" title="Clear All">
+                            <i class="fas fa-broom"></i> 
+                            <span>Clear All</span>
+                            <small>Remove everything</small>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="tool-section">
+                    <h4>File Operations</h4>
+                    <div class="tool-buttons">
+                        <button id="load-pattern" class="tool-btn" title="Load Pattern">
+                            <i class="fas fa-folder-open"></i> 
+                            <span>Load</span>
+                            <small>Load saved pattern</small>
+                        </button>
+                        <button id="export-pattern" class="tool-btn" title="Export Pattern">
+                            <i class="fas fa-download"></i> 
+                            <span>Export</span>
+                            <small>Export as file</small>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Container -->
+        <div id="map-container" class="main-content">
+            <div id="map"></div>
+            
+            <!-- Feature Properties Panel -->
+            <div id="properties-panel" class="properties-panel hidden">
+                <div class="panel-header">
+                    <h3>Feature Properties</h3>
+                    <button id="close-properties" class="close-btn">&times;</button>
+                </div>
+                <div class="panel-content">
+                    <div id="feature-properties">
+                        <!-- Feature properties will be populated here -->
+                    </div>
+                    <div class="panel-actions">
+                        <button id="apply-properties" class="btn btn-primary">Apply</button>
+                        <button id="cancel-properties" class="btn btn-secondary">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-left">
+                <span id="cursor-coordinates">Coordinates: ---, ---</span>
+                <span id="current-tool">Tool: None</span>
+                <span id="measurement-info">Measurement: --</span>
+            </div>
+            <div class="status-right">
+                <span id="feature-count">Features: 0</span>
+                <span id="map-zoom">Zoom: --</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/map.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ttc-tools.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
