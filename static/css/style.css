@@ -439,6 +439,80 @@ body {
     border-color: #3498db;
 }
 
+/* Form elements for feature attributes */
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 2px solid #bdc3c7;
+    border-radius: 4px;
+    font-size: 0.9em;
+    transition: border-color 0.3s ease;
+    box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+/* Advanced Labeling Properties Collapsible Section */
+.advanced-labeling-section {
+    margin-top: 10px;
+}
+
+.collapsible-header {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 10px 15px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    color: #495057;
+    transition: background-color 0.2s ease;
+}
+
+.collapsible-header:hover {
+    background: #e9ecef;
+}
+
+.collapsible-content {
+    border: 1px solid #dee2e6;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    padding: 15px;
+    background: #ffffff;
+}
+
+.collapse-arrow {
+    font-size: 0.8em;
+    transition: transform 0.2s ease;
+}
+
+.feature-type {
+    background: #ecf0f1;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    text-align: center;
+    color: #2c3e50;
+}
+
 .property-group input:disabled {
     background-color: #ecf0f1;
     color: #7f8c8d;
@@ -724,4 +798,28 @@ body {
         height: 100vh !important;
         margin-left: 0 !important;
     }
+}
+
+/* Feature Labels */
+.feature-label {
+    z-index: 900 !important;
+    pointer-events: none;
+}
+
+.label-text {
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid #2c3e50;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-weight: bold;
+    font-size: 12px;
+    color: #2c3e50;
+    text-align: center;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    transform-origin: center center;
+    min-width: 60px;
+    display: inline-block;
 }

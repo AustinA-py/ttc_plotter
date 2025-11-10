@@ -178,9 +178,23 @@ function createWorkLocationPoint(latlng) {
         })
     });
 
+    // Set default attributes
+    workPoint.ttcAttributes = {
+        type: 'work-point',
+        title: 'Work Point'
+    };
+
+    console.log('Work point created with attributes:', workPoint.ttcAttributes); // Debug
+
     workPoint.addTo(drawnItems);
     ttcFeatures.workPoints.push(workPoint);
     updateFeatureCount();
+    
+    // Set up initial display first
+    updateFeatureDisplay(workPoint);
+    
+    // Show properties panel for user to set title
+    showFeatureProperties(workPoint);
     
     console.log('Work location point created at:', latlng);
 }
@@ -196,8 +210,22 @@ function createWarningSign(latlng) {
         })
     });
 
+    // Set default attributes
+    warningSign.ttcAttributes = {
+        type: 'warning-sign',
+        signType: 'Lane Closed'
+    };
+
+    console.log('Warning sign created with attributes:', warningSign.ttcAttributes); // Debug
+
     warningSign.addTo(drawnItems);
     ttcFeatures.warningSigns.push(warningSign);
+    
+    // Show properties panel for user to set sign type
+    showFeatureProperties(warningSign);
+    
+    // Set up initial display
+    updateFeatureDisplay(warningSign);
     updateFeatureCount();
     
     console.log('Warning sign created at:', latlng);
