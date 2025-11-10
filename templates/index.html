@@ -30,16 +30,32 @@
                     </div>
                 </div>
                 
-                <!-- Search Bar -->
-                <div class="search-container">
-                    <div class="search-box">
-                        <i class="fas fa-search search-icon"></i>
-                        <input type="text" id="location-search" placeholder="Search for address or coordinates..." />
-                        <button id="search-button" class="search-btn" title="Search">
-                            <i class="fas fa-arrow-right"></i>
+                <!-- Right side with file operations and search -->
+                <div class="header-right">
+                    <!-- File Operations -->
+                    <div class="file-operations">
+                        <button id="load-pattern" class="header-icon-btn" title="Load Pattern">
+                            <i class="fas fa-folder-open"></i>
+                        </button>
+                        <button id="export-pattern" class="header-icon-btn" title="Download Data">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button id="export-placeholder" class="header-icon-btn placeholder" title="Export (Coming Soon)">
+                            <i class="fas fa-file-export"></i>
                         </button>
                     </div>
-                    <div id="search-results" class="search-results hidden"></div>
+                    
+                    <!-- Search Bar -->
+                    <div class="search-container">
+                        <div class="search-box">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" id="location-search" placeholder="Search for address or coordinates..." />
+                            <button id="search-button" class="search-btn" title="Search">
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                        <div id="search-results" class="search-results hidden"></div>
+                    </div>
                 </div>
             </div>
         </header>
@@ -102,22 +118,6 @@
                             <i class="fas fa-broom"></i> 
                             <span>Clear All</span>
                             <small>Remove everything</small>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="tool-section">
-                    <h4>File Operations</h4>
-                    <div class="tool-buttons">
-                        <button id="load-pattern" class="tool-btn" title="Load Pattern">
-                            <i class="fas fa-folder-open"></i> 
-                            <span>Load</span>
-                            <small>Load saved pattern</small>
-                        </button>
-                        <button id="export-pattern" class="tool-btn" title="Export Pattern">
-                            <i class="fas fa-download"></i> 
-                            <span>Export</span>
-                            <small>Export as file</small>
                         </button>
                     </div>
                 </div>
