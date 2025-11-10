@@ -390,6 +390,19 @@ body {
     background: linear-gradient(135deg, #ec7063 0%, #e74c3c 100%);
 }
 
+.tool-btn.danger.active {
+    background: linear-gradient(135deg, #8b0000 0%, #660000 100%) !important;
+    box-shadow: 0 6px 20px rgba(139, 0, 0, 0.6) !important;
+    border: 3px solid #fff !important;
+    transform: translateY(-2px) !important;
+    color: #fff !important;
+}
+
+.tool-btn.danger.active:hover {
+    background: linear-gradient(135deg, #660000 0%, #4d0000 100%) !important;
+    box-shadow: 0 8px 25px rgba(139, 0, 0, 0.8) !important;
+}
+
 /* Map container */
 .main-content {
     flex: 1;
@@ -854,6 +867,19 @@ body {
 .feature-label {
     z-index: 900 !important;
     pointer-events: none;
+}
+
+/* Custom Label Icon - invisible marker for positioning */
+.custom-label-icon {
+    background: transparent !important;
+    border: none !important;
+    pointer-events: auto !important;  /* Allow clicks for deletion */
+}
+
+.custom-label-icon div {
+    background: transparent !important;
+    opacity: 0 !important;
+    pointer-events: auto !important;  /* Allow clicks for deletion */
 }
 
 .label-text {

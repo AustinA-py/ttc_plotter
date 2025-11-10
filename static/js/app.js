@@ -315,7 +315,9 @@ function setupToolButtons() {
         'lane-closure',
         'taper',
         'buffer',
-        'warning-sign'
+        'warning-sign',
+        'custom-label',
+        'call-out'
     ];
     
     toolButtons.forEach(toolId => {
@@ -530,8 +532,39 @@ function setupPropertiesPanel() {
 
 // Select tool function
 function selectTool(toolId) {
-    // Clear any active drawing mode first (this will reset cursor)
-    clearCurrentTool();
+    console.log('=== selectTool START ===', toolId);
+    
+    // Explicitly disable delete mode first if it's active
+    const deleteBtn = document.getElementById('delete-mode');
+    if (deleteBtn && deleteBtn.classList.contains('active')) {
+        console.log('Disabling delete mode for tool selection:', toolId);
+        deleteBtn.classList.remove('active');
+        
+        // Reset delete button appearance
+        const iconElement = deleteBtn.querySelector('i');
+        const spanElement = deleteBtn.querySelector('span');
+        const smallElement = deleteBtn.querySelector('small');
+        
+        if (iconElement) iconElement.className = 'fas fa-trash';
+        if (spanElement) spanElement.textContent = 'Delete';
+        if (smallElement) smallElement.textContent = 'Remove features';
+        
+        // Remove delete click handler
+        map.off('click', handleDeleteClick);
+        
+        // Reset cursor
+        document.getElementById('map').style.cursor = '';
+        
+        console.log('Delete mode fully disabled');
+    }
+    
+    // Clear any active drawing mode
+    if (typeof clearCurrentTool === 'function') {
+        // Temporarily disable the delete mode clearing in clearCurrentTool
+        clearCurrentTool._skipDeleteDisable = true;
+        clearCurrentTool();
+        clearCurrentTool._skipDeleteDisable = false;
+    }
     
     // Remove active class from all tool buttons
     document.querySelectorAll('.tool-btn').forEach(btn => {
@@ -542,32 +575,85 @@ function selectTool(toolId) {
     const selectedBtn = document.getElementById(toolId);
     if (selectedBtn) {
         selectedBtn.classList.add('active');
+        console.log('Tool button activated:', toolId);
+    } else {
+        console.error('Tool button not found:', toolId);
     }
     
     // Set current tool (this will automatically start drawing mode for polygon/line tools and set cursor for point tools)
+    console.log('Calling setCurrentTool for:', toolId);
     setCurrentTool(toolId);
     
-    console.log('Tool selected:', toolId);
+    console.log('Tool selected:', toolId, 'currentTool is now:', currentTool);
 }
 
 // Toggle delete mode
 function toggleDeleteMode() {
+    console.log('=== toggleDeleteMode START ===');
     const deleteBtn = document.getElementById('delete-mode');
+    const iconElement = deleteBtn.querySelector('i');
+    const spanElement = deleteBtn.querySelector('span');
+    const smallElement = deleteBtn.querySelector('small');
     
     if (deleteBtn.classList.contains('active')) {
+        console.log('Disabling delete mode');
         // Disable delete mode
         deleteBtn.classList.remove('active');
         disableDeleteMode();
+        
+        // Reset button text
+        if (iconElement) iconElement.className = 'fas fa-trash';
+        if (spanElement) spanElement.textContent = 'Delete';
+        if (smallElement) smallElement.textContent = 'Remove features';
+        
+        console.log('Delete mode disabled');
     } else {
-        // Enable delete mode
+        console.log('Enabling delete mode');
+        
+        // Close the feature properties panel if it's open
+        const propertiesPanel = document.getElementById('properties-panel');
+        if (propertiesPanel && !propertiesPanel.classList.contains('hidden')) {
+            console.log('Closing properties panel for delete mode activation');
+            if (typeof hideFeatureProperties === 'function') {
+                hideFeatureProperties();
+            } else {
+                // Fallback - close panel manually
+                propertiesPanel.classList.add('hidden');
+                propertiesPanel.style.display = 'none';
+                propertiesPanel.currentLayer = null;
+            }
+        }
+        
+        // First, clear any active drawing tools
+        if (typeof clearCurrentTool === 'function') {
+            clearCurrentTool._skipDeleteDisable = true;  // Don't let clearCurrentTool interfere
+            clearCurrentTool();
+            clearCurrentTool._skipDeleteDisable = false;
+        }
+        
+        // Remove active state from all other tool buttons
+        document.querySelectorAll('.tool-btn:not(#delete-mode)').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // Activate delete mode
         deleteBtn.classList.add('active');
         enableDeleteMode();
+        
+        // Update button text to show active state
+        if (iconElement) iconElement.className = 'fas fa-times-circle';
+        if (spanElement) spanElement.textContent = 'Delete Active';
+        if (smallElement) smallElement.textContent = 'Click feature to delete';
+        
+        console.log('Delete mode enabled, other tools disabled, properties panel closed');
     }
+    
+    console.log('=== toggleDeleteMode END ===');
 }
 
 // Enable delete mode
 function enableDeleteMode() {
-    clearCurrentTool();
+    console.log('enableDeleteMode called');
     
     // Add click handler for deletion
     map.on('click', handleDeleteClick);
@@ -575,7 +661,7 @@ function enableDeleteMode() {
     // Change cursor
     document.getElementById('map').style.cursor = 'crosshair';
     
-    console.log('Delete mode enabled');
+    console.log('Delete mode enabled - click handler added, cursor changed');
 }
 
 // Disable delete mode
@@ -585,21 +671,82 @@ function disableDeleteMode() {
     // Reset cursor
     document.getElementById('map').style.cursor = '';
     
+    // Reset button text when disabled from other functions
+    const deleteBtn = document.getElementById('delete-mode');
+    if (deleteBtn) {
+        const iconElement = deleteBtn.querySelector('i');
+        const spanElement = deleteBtn.querySelector('span');
+        const smallElement = deleteBtn.querySelector('small');
+        
+        if (iconElement) iconElement.className = 'fas fa-trash';
+        if (spanElement) spanElement.textContent = 'Delete';
+        if (smallElement) smallElement.textContent = 'Remove features';
+    }
+    
     console.log('Delete mode disabled');
 }
 
 // Handle delete clicks
 function handleDeleteClick(e) {
+    console.log('=== DELETE CLICK DEBUG ===');
+    console.log('Click coordinates:', e.latlng);
+    
     // Find if we clicked on a feature
     let featureToDelete = null;
+    let debugInfo = [];
     
     drawnItems.eachLayer(function(layer) {
+        console.log('Checking layer:', layer);
+        console.log('Layer type:', layer.ttcAttributes?.type);
+        console.log('Layer has getLatLng:', !!layer.getLatLng);
+        console.log('Layer has getBounds:', !!layer.getBounds);
+        console.log('Layer has getLatLngs:', !!layer.getLatLngs);
+        
+        // Handle polygon features (work zones)
         if (layer.getBounds && layer.getBounds().contains(e.latlng)) {
+            console.log('Polygon detection: MATCHED');
             featureToDelete = layer;
-        } else if (layer.getLatLng && map.distance(layer.getLatLng(), e.latlng) < 50) {
-            featureToDelete = layer;
+        } 
+        // Handle point features (warning signs, work points, custom labels)
+        else if (layer.getLatLng) {
+            const layerPos = layer.getLatLng();
+            const distance = map.distance(layerPos, e.latlng);
+            // Use larger detection radius for custom labels since they're invisible
+            const detectionRadius = (layer.ttcAttributes && layer.ttcAttributes.type === 'custom-label') ? 100 : 50;
+            
+            console.log(`Point detection: Layer at ${layerPos.lat}, ${layerPos.lng}, distance: ${distance}m, radius: ${detectionRadius}m`);
+            
+            debugInfo.push({
+                type: layer.ttcAttributes?.type,
+                position: layerPos,
+                distance: distance,
+                radius: detectionRadius,
+                matched: distance < detectionRadius
+            });
+            
+            if (distance < detectionRadius) {
+                console.log('Point detection: MATCHED');
+                featureToDelete = layer;
+            }
+        }
+        // Handle polyline features (lane closures, tapers, buffers, call-outs)
+        else if (layer.getLatLngs) {
+            console.log('Checking polyline feature...');
+            const latLngs = layer.getLatLngs();
+            // Check if click is near any point of the line (simplified approach)
+            for (let i = 0; i < latLngs.length; i++) {
+                const pointDistance = map.distance(latLngs[i], e.latlng);
+                if (pointDistance < 30) { // 30 meter tolerance for line points
+                    console.log('Polyline detection: MATCHED');
+                    featureToDelete = layer;
+                    break;
+                }
+            }
         }
     });
+    
+    console.log('Debug info for all layers:', debugInfo);
+    console.log('Feature to delete:', featureToDelete);
     
     if (featureToDelete) {
         if (confirm('Delete this feature?')) {
@@ -620,6 +767,14 @@ function handleDeleteClick(e) {
             
             updateFeatureCount();
             console.log('Feature deleted');
+            
+            // Close delete tool after successful deletion
+            const deleteBtn = document.getElementById('delete-mode');
+            if (deleteBtn.classList.contains('active')) {
+                deleteBtn.classList.remove('active');
+                disableDeleteMode();
+                console.log('Delete tool closed after feature deletion');
+            }
         }
     }
 }
