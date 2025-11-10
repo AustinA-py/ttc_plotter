@@ -357,11 +357,19 @@ function setupFileButtons() {
         });
     }
     
-    // Export pattern button
+    // Export pattern button (Download Data)
     const exportBtn = document.getElementById('export-pattern');
     if (exportBtn) {
         exportBtn.addEventListener('click', function() {
             exportPattern();
+        });
+    }
+    
+    // Export placeholder button
+    const exportPlaceholderBtn = document.getElementById('export-placeholder');
+    if (exportPlaceholderBtn) {
+        exportPlaceholderBtn.addEventListener('click', function() {
+            alert('Export functionality coming soon! This feature is currently under development.');
         });
     }
 }
